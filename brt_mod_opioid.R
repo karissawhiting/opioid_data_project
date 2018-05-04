@@ -5,6 +5,7 @@ library(tree)
 library(randomForest)
 library(rpart)
 library(gbm)
+library(glmnet)
 library(e1071)
 o <- read_csv(file = "./data/clean_data.csv")
 
@@ -39,6 +40,18 @@ plot(pred, o$Overdose)
 featurePlot(o[,-c(10,1)], y = o$Overdose)
 
 #LASSO
+x<- model.matrix(Overdose ~ ., data = o)[,-1]
+cv <- cv.glmnet(x, o$Overdose)
+plot(cv)
+bestlam=cv$lambda.min
+
+lass<- glmnet(x, o$Overdose, alpha = 1, lambda = bestlam)
+plot(lass)
+lasso.coef=predict(lass,type="coefficients", s=bestlam)
+
+lasso.pred <- predict(lass, s = bestlam, newx = x)
+sqrt(mean((lasso.pred-o$Overdose)^2))
+
 
 #shows non linear is likely. should add term 
 # Basic Tree Mod --------------------
@@ -49,20 +62,9 @@ summary(tree.op)
 plot(tree.op)
 text(tree.op, pretty = 0)
 
-important(tree.op)
-
-lin.mod <- lm(Overdose ~ ., data = o)
-
-summary(lin.mod)
-
-
-
 # Boosted Tree Mod --------------------
 
 set.seed(1)
-train_ind <- sample(1:nrow(o), 34)
-train <- o[train_ind,]
-test <- o[-train_ind,]
 
 pows <- seq(-10, -0.2, by = 0.5)
 lambdas <- 10^pows
@@ -90,15 +92,18 @@ plot(pred, o$Overdose)
 set.seed(1)
 rfmod = randomForest(Overdose ~. ,o, importance = TRUE)
 rfmod
+summary(rfmod)
 
 pred = predict(rfmod, newdata = o)
+importance(rfmod)
+
 sqrt(mean((pred - o$Overdose)^2)) #RMSE is about 3 best!
 plot(pred, o$Overdose)
 
 
 # Bagged Tree Mod --------------------
 set.seed(1)
-bag.mod = randomForest(Overdose ~. ,o, mtry = 17, importance = TRUE)
+bag.mod = randomForest(Overdose ~. ,o, mtry = 23, importance = TRUE)
 bag.mod
 importance(bag.mod)
 
