@@ -28,12 +28,27 @@ cor(o[,-10])
 #Opiood claims and # presecribers related
 # Linear Mod --------------------
 
-lin.mod <- lm(Overdose ~ ., data = o)
-summary(lin.mod)
+ctrl<-trainControl(method = "cv", number = 6)
+lmCVFit<-train(Overdose ~ ., data = o, method = "lm", trControl = ctrl, metric="RMSE")
 
-plot(lin.mod)
+summary(lmCVFit)
+
+o<-o[sample(nrow(o)),]
+folds <- cut(seq(1,nrow(o)),breaks=6,labels=FALSE)
+
+for(i in 1:6){
+  #Segement your data by fold using the which() function 
+  testIndexes <- which(folds==i,arr.ind=TRUE)
+  testData <- o[testIndexes, ]
+  trainData <- o[-testIndexes, ]
+  mod <- lm(Overdose ~ ., trainData)
+  pred <- predict(mod, testData)
+  print(sqrt(mean((pred - testData$Overdose)^2)))
+}
+
+#plot(lmCVFit)
 #test error
-pred <- predict(lin.mod, o)
+pred <- predict(lmCVFit, o)
 sqrt(mean((pred - o$Overdose)^2)) #RMSE is about 5
 plot(pred, o$Overdose)
 
