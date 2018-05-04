@@ -40,6 +40,9 @@ summary(Op_Claims.mod) # borderline
 ExtRel_Claims.mod <- lm(Overdose ~ ExtRel_Claims, data = o.new)
 summary(ExtRel_Claims.mod)
 
+Poverty.mod <- lm(Overdose ~ Poverty, data = o.new)
+summary(Poverty.mod)
+
 Metro.mod <- lm(Overdose ~ Metro, data = o.new)
 summary(Metro.mod)
 
@@ -63,6 +66,9 @@ summary(PoorMH.mod)
 Depression.mod <- lm(Overdose ~ Depression, data = o.new)
 summary(Depression.mod) ##
 
+Alcohol.mod <- lm(Overdose ~ Alcohol, data = o.new)
+summary(Alcohol.mod) ##
+
 Txt_Teens.mod <- lm(Overdose ~ Txt_Teens, data = o.new)
 summary(Txt_Teens.mod)
 
@@ -72,27 +78,45 @@ summary(Txt_Adults.mod) ###
 Adults.mod <- lm(Overdose ~ Adults, data = o.new)
 summary(Adults.mod) 
 
+Medicaid.mod <- lm(Overdose ~ Medicaid, data = o.new)
+summary(Medicaid.mod) 
 
+Unemployment.mod <- lm(Overdose ~ Unemployment, data = o.new)
+summary(Unemployment.mod) 
+
+Education.mod <- lm(Overdose ~ Education, data = o.new)
+summary(Education.mod) 
+
+Income.mod <- lm(Overdose ~ as.numeric(Income), data = o.new)
+summary(Income.mod) 
+
+Foreclosures.mod <- lm(Overdose ~ Foreclosures, data = o.new)
+summary(Foreclosures.mod) 
+
+Medicaid_Rx.mod <- lm(Overdose ~ Medicaid_Rx, data = o.new)
+summary(Medicaid_Rx.mod) 
 
 ## multivariate model ##
-mv.mod1 <- lm(Overdose ~ Op_Prescribers2 + Op_Claims + Spending + 
-                 RxFilled + Med_Exp + Depression + Txt_Adults, data = o.new)
+mv.mod1 <- lm(Overdose ~ Op_Prescribers2 + 
+                 RxFilled + Depression , data = o.new)
 summary(mv.mod1)
 
 
 #VIF
 vif(lm(mv.mod1, data=o.new)) # explore Op_Prescribers2 & Op_Claims   ?
 
-mv.mod2 <- lm(Overdose ~ Op_Prescribers2 + Op_Claims + Spending + 
-                  RxFilled + Med_Exp + Depression + Txt_Adults
-                    + Op_Prescribers2 * Op_Claims, data = o.new)
+mv.mod2 <- lm(Overdose ~  + Op_Prescribers2 +
+                RxFilled + Med_Exp + Depression + Txt_Adults
+              + Op_Prescribers1_t + Medicaid + Medicaid_Rx, data = o.new)
 summary(mv.mod2)
 
+vif(lm(mv.mod2, data=o.new)) 
 
-mv.mod3 <- lm(Overdose ~ Op_Prescribers2 + Op_Claims + 
+mv.mod3 <- lm(Overdose ~ Op_Prescribers2 + 
                   RxFilled + Depression +
                     Op_Prescribers2 * Op_Claims, data = o.new)
 summary(mv.mod3)
+
 
 # not enough evidence for multicollinearity??
 
