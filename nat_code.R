@@ -18,8 +18,8 @@ op <- op %>%
 map(op, ~sum(is.na(.x)))
 
 
-# cross val --------------------
-
+# cross val lm --------------------
+set.seed(1)
 cvSplits <- createFolds(op$Overdose, 
                         k = 10, 
                         returnTrain = TRUE)
@@ -104,3 +104,125 @@ prune.op = prune(tree.op, best=3) #best tree has 3 terminal nodes
 plot(prune.op)
 text(prune.op, pretty = 0)
 
+
+#cross val tree -----------------------------------------------
+set.seed(1)
+cvSplits <- createFolds(op$Overdose, 
+                        k = 6, 
+                        returnTrain = TRUE)
+K <- 6
+mseK2a <- rep(NA, K)
+
+for(k in 1:K)
+{
+  trRows <- cvSplits[[k]]
+  fit_tr2a = tree(Overdose ~., data = op[trRows,])
+  mseK2a[k] <- mean((predict(fit_tr2, op[-trRows,])-op$Overdose[-trRows])^2)
+}
+# K-fold MSE
+sqrt(mean(mseK2a))
+
+
+
+
+#cross val tree (pruned) --------------------------------------
+
+set.seed(1)
+cvSplits <- createFolds(op$Overdose, 
+                        k = 10, 
+                        returnTrain = TRUE)
+K <- 10
+mseK2 <- rep(NA, K)
+
+for(k in 1:K)
+{
+  trRows <- cvSplits[[k]]
+  tree.op = tree(Overdose ~., data = op[trRows,])
+  fit_tr2 <- prune(tree.op, best=3)
+  mseK2[k] <- mean((predict(fit_tr2, op[-trRows,])-op$Overdose[-trRows])^2)
+}
+# K-fold MSE
+sqrt(mean(mseK2))
+
+
+#cross val bagging -------------------------------------------------
+
+library(randomForest)
+set.seed(1)
+
+cvSplits <- createFolds(op$Overdose, 
+                        k = 6, 
+                        returnTrain = TRUE)
+K <- 6
+mseK3 <- rep(NA, K)
+
+for(k in 1:K)
+{
+  trRows <- cvSplits[[k]]
+  fit_tr3 <- randomForest(Overdose ~ ., data=op[trRows,], mtry=23, importance =TRUE)
+  mseK3[k] <- mean((predict(fit_tr3, op[-trRows,])-op$Overdose[-trRows])^2)
+}
+# K-fold MSE
+sqrt(mean(mseK3))
+
+plot(mseK3,op$Overdose)
+
+impp = importance(fit_tr3)
+rownames(impp)[order(imp[, 1], decreasing=TRUE)]
+
+
+
+#cross val randomforest -------------------------------------------
+
+library(randomForest)
+set.seed(1)
+
+cvSplits <- createFolds(op$Overdose, 
+                        k = 6, 
+                        returnTrain = TRUE)
+K <- 6
+mseK4 <- rep(NA, K)
+
+for(k in 1:K)
+{
+  trRows <- cvSplits[[k]]
+  fit_tr4 <- randomForest(Overdose ~ ., data=op[trRows,], importance =TRUE)
+  mseK4[k] <- mean((predict(fit_tr4, op[-trRows,])-op$Overdose[-trRows])^2)
+}
+# K-fold MSE
+sqrt(mean(mseK4))
+imp=importance(fit_tr4)
+rownames(imp)[order(imp[, 1], decreasing=TRUE)]
+
+
+
+#cross val boosting via caret----------------------------------------
+library(gbm)
+library(caret)
+set.seed(1)
+pows <- seq(-10, -0.2, by = 0.1)
+lambdas <- 10^pows
+test.err <- rep(NA, length(lambdas))
+
+ctrl<-trainControl(method = "cv",
+                   number = 10)
+
+tuneGrid<-  expand.grid(interaction.depth = c(3,5), 
+                        n.trees = c(500, 750),
+                        shrinkage = c(.01, .1),
+                        n.minobsinnode = c(2, 8))
+
+boost.mod <-train(Overdose ~ ., data = op, 
+                  method = "gbm", 
+                  tuneGrid = tuneGrid,
+                  trControl = ctrl, metric="RMSE")
+
+boost.mod$bestTune 
+boost.mod$finalModel
+boost.mod$results$RMSE[which.min(boost.mod$results$RMSE)]
+
+plot(boost.mod)
+
+#pred = predict(boost.mod, op, n.trees=750)
+
+#View (cbind.data.frame(pred, op$Overdose))
