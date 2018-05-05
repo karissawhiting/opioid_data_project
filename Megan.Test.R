@@ -96,7 +96,11 @@ summary(Foreclosures.mod)
 Medicaid_Rx.mod <- lm(Overdose ~ Medicaid_Rx, data = o.new)
 summary(Medicaid_Rx.mod) 
 
-## multivariate model ##
+## multivariate model ##\
+mv.mod0 <- lm(Overdose ~., data = o.new)
+summary(mv.mod0)
+
+
 mv.mod1 <- lm(Overdose ~ Op_Prescribers2 + 
                  RxFilled + Depression , data = o.new)
 summary(mv.mod1)
@@ -161,16 +165,47 @@ for(i in 1:10){
 set.seed(1)
 tree.o <- tree(Overdose ~ ., data = o.new)
 summary(tree.o)
-
 plot(tree.o)
 text(tree.o, pretty = 0)
 
 
-#random forest 
 set.seed(1)
-rf.o=randomForest(Purchase~., data=train.OJ, importance=T)
-importance(rf.o)
+pows <- seq(-10, -0.2, by = 0.5)
+lambdas <- 10^pows
+train.err <- rep(NA, length(lambdas))
 
-preds <- predict(rf.OJ, newdata=test.OJ)
 
-table(preds, test.OJ$Purchase)
+# caret
+ctrl<-trainControl(method = "cv",
+                   number = 6)
+
+tuneGrid<-  expand.grid(interaction.depth = c(3,5), 
+                        n.trees = c(100, 500),
+                        shrinkage = c(.01, .1),
+                        n.minobsinnode = c(2, 8))
+
+boost.mod <-train(Overdose ~ ., data = o, 
+                  method = "gbm", 
+                  tuneGrid = tuneGrid,
+                  trControl = ctrl, metric="RMSE")
+boost.mod$bestTune 
+boost.mod$finalModel
+
+boost.mod$results$RMSE[which.min(boost.mod$results$RMSE)] #6.09
+
+
+# RF Tree Mod 
+set.seed(1)
+rfmod = randomForest(Overdose ~. ,o, importance = TRUE)
+rfmod
+summary(rfmod)
+
+pred = predict(rfmod, newdata = o)
+importance(rfmod)
+
+sqrt(mean((pred - o$Overdose)^2))
+plot(pred, o$Overdose) #3 
+
+
+
+
