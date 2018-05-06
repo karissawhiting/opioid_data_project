@@ -21,13 +21,13 @@ map(op, ~sum(is.na(.x)))
 # cross val lm --------------------
 set.seed(1)
 cvSplits <- createFolds(op$Overdose, 
-                        k = 10, 
+                        k = 6, 
                         returnTrain = TRUE)
 # returnTrain = TRUE: return indices which are held-out (training data)
 str(cvSplits)
 
 
-K <- 10
+K <- 6
 mseK1 <- rep(NA, K)
 
 for(k in 1:K)
@@ -39,6 +39,7 @@ for(k in 1:K)
 }
 # K-fold MSE
 sqrt(mean(mseK1))
+11.7^2
 
 
 #Karissa's cv code for comparison:
@@ -117,7 +118,7 @@ for(k in 1:K)
 {
   trRows <- cvSplits[[k]]
   fit_tr2a = tree(Overdose ~., data = op[trRows,])
-  mseK2a[k] <- mean((predict(fit_tr2, op[-trRows,])-op$Overdose[-trRows])^2)
+  mseK2a[k] <- mean((predict(fit_tr2a, op[-trRows,])-op$Overdose[-trRows])^2)
 }
 # K-fold MSE
 sqrt(mean(mseK2a))
@@ -129,9 +130,9 @@ sqrt(mean(mseK2a))
 
 set.seed(1)
 cvSplits <- createFolds(op$Overdose, 
-                        k = 10, 
+                        k = 6, 
                         returnTrain = TRUE)
-K <- 10
+K <- 6
 mseK2 <- rep(NA, K)
 
 for(k in 1:K)
@@ -141,9 +142,9 @@ for(k in 1:K)
   fit_tr2 <- prune(tree.op, best=3)
   mseK2[k] <- mean((predict(fit_tr2, op[-trRows,])-op$Overdose[-trRows])^2)
 }
-# K-fold MSE
+# K-fold RMSE
 sqrt(mean(mseK2))
-
+8.9^2
 
 #cross val bagging -------------------------------------------------
 
@@ -162,14 +163,20 @@ for(k in 1:K)
   fit_tr3 <- randomForest(Overdose ~ ., data=op[trRows,], mtry=23, importance =TRUE)
   mseK3[k] <- mean((predict(fit_tr3, op[-trRows,])-op$Overdose[-trRows])^2)
 }
-# K-fold MSE
+# K-fold RMSE
 sqrt(mean(mseK3))
+
 
 plot(mseK3,op$Overdose)
 
 impp = importance(fit_tr3)
+varImpPlot(fit_tr3)
 rownames(impp)[order(imp[, 1], decreasing=TRUE)]
 
+
+#rf = randomForest(Overdose ~ ., data=op, mtry=23, importance =TRUE)
+#pred = mean((predict(rf, op)-op$Overdose)^2)
+#sqrt(mean(pred))
 
 
 #cross val randomforest -------------------------------------------
@@ -186,12 +193,15 @@ mseK4 <- rep(NA, K)
 for(k in 1:K)
 {
   trRows <- cvSplits[[k]]
-  fit_tr4 <- randomForest(Overdose ~ ., data=op[trRows,], importance =TRUE)
+  fit_tr4 <- randomForest(Overdose ~ ., data=op[trRows,], mtry=7, importance =TRUE)
   mseK4[k] <- mean((predict(fit_tr4, op[-trRows,])-op$Overdose[-trRows])^2)
 }
 # K-fold MSE
 sqrt(mean(mseK4))
+fit_tr4$mtry
 imp=importance(fit_tr4)
+varImpPlot(fit_tr4)
+
 rownames(imp)[order(imp[, 1], decreasing=TRUE)]
 
 
@@ -205,7 +215,7 @@ lambdas <- 10^pows
 test.err <- rep(NA, length(lambdas))
 
 ctrl<-trainControl(method = "cv",
-                   number = 10)
+                   number = 6)
 
 tuneGrid<-  expand.grid(interaction.depth = c(3,5), 
                         n.trees = c(500, 750),
