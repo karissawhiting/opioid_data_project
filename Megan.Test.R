@@ -97,7 +97,7 @@ Medicaid_Rx.mod <- lm(Overdose ~ Medicaid_Rx, data = o.new)
 summary(Medicaid_Rx.mod) 
 
 ## multivariate model ##\
-mv.mod0 <- lm(Overdose ~., data = o.new)
+mv.mod0 <- lm(Overdose ~. - Income + as.numeric(Income), data = o.new)
 summary(mv.mod0)
 
 
@@ -107,7 +107,9 @@ summary(mv.mod1)
 
 
 #VIF
-vif(lm(mv.mod1, data=o.new)) # explore Op_Prescribers2 & Op_Claims   ?
+vif(lm(mv.mod0, data=o.new)) # explore Op_Prescribers2 & Op_Claims   ?
+
+cor(as.numeric(o.new))
 
 mv.mod2 <- lm(Overdose ~  + Op_Prescribers2 +
                 RxFilled + Med_Exp + Depression + Txt_Adults
@@ -130,7 +132,59 @@ summary(mv.mod4)
 
 
 
+transform(o.new, Income = as.numeric(Income))
+
+
+# cross validation lm
+
+set.seed(1)
+cvSplits <- createFolds(o.new$Overdose, 
+                        k = 10, 
+                        returnTrain = TRUE)
+
+
+# returnTrain = TRUE: return indices which are held-out (training data)
+str(cvSplits)
+
+K <- 10
+mseK1 <- rep(NA, K)
+
+for(k in 1:K)
+{
+  trRows <- cvSplits[[k]]
+  fit_tr1 <- lm(Overdose~., data = o.new[trRows,])
+  mseK1[k] <- mean((predict(fit_tr1, o.new[-trRows,])-o.new$Overdose[-trRows])^2)
+}
+
+
+
+# Try caret cross validation
+ctrl<-trainControl(method = "cv", number = 6) 
+lmCVFit<-train(Overdose ~ ., data = o.new, method = "lm", trControl = ctrl, metric="RMSE")
+summary(lmCVFit)
+featurePlot(o.new[,-c(10,1)], y = o.new$Overdose)
+
+
+
+# K-fold MSE
+sqrt(mean(mseK1))
+
+
+
+
+
+
 ###tree methods###
+
+
+
+
+
+
+
+
+
+
 
 ### k fold validation ###
 train_control<- trainControl(method="cv", number=10, savePredictions = TRUE)
