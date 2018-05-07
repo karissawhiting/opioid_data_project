@@ -9,6 +9,8 @@ library(glmnet)
 library(e1071)
 o <- read_csv(file = "./data/clean_data.csv")
 
+# Summary Stats --------------------
+
 o <- o %>%
   dplyr::select(-X1, -State, -Abrev, -MH_Spending, -Op_Prescribers1, -Homeless, -Alldrug_OD) %>%
   mutate(Med_Exp= as.factor(Med_Exp)) %>%
@@ -16,22 +18,25 @@ o <- o %>%
 
 map(o, ~sum(is.na(.x)))
 
-# Summary Stats --------------------
+cor(o2)
+o2 <- o[,-10]
+cor(o2)
+
+o2 <- na.omit(o2)
+vif(lm(Overdose ~ ., o2))
 
 summary(o)
-
 summary(o$Overdose)
 hist(o$Overdose, breaks = 10)
-
-cor(o[,-10])
-
-#Opiood claims and # presecriber are correlated
+View(cor(o[,-10])) #Opiood claims and # presecriber are correlated
 
 # Linear Mod --------------------
 
-# Try caret cross validation
+set.seed(1)
+
+# caret cross validation
 ctrl<-trainControl(method = "cv", number = 6) # I think this can be changes to leave one out somehow. probably via the "method" argument of this function.
-lmCVFit<-train(Overdose ~ ., data = o, method = "lm", trControl = ctrl, metric="RMSE")
+lmCVFit<-train(Overdose ~ ., data = o, method = "lm", trControl = ctrl, metric="MSE")
 summary(lmCVFit)
 featurePlot(o[,-c(10,1)], y = o$Overdose)
 
@@ -94,6 +99,7 @@ lasso.mod$results$RMSE[which.min(lasso.mod$results$RMSE)]
 
 
 # Basic Tree Mod -------------------- 
+set.seed(1)
 
 tree.op <- tree(Overdose ~ ., data = o)
 summary(tree.op)
@@ -101,38 +107,93 @@ summary(tree.op)
 plot(tree.op)
 text(tree.op, pretty = 0)
 
-# Boosted Tree Mod --------------------
+set.seed(10)
+vec <- c()
+for(i in 1:6){
+  #Segement your data by fold using the which() function 
+  testIndexes <- which(folds==i,arr.ind=TRUE)
+  testData <- o[testIndexes, ]
+  trainData <- o[-testIndexes, ]
+  mod <- tree(Overdose ~ ., data = o)
+  pred <- predict(mod, testData)
+  print(sqrt(mean((pred - testData$Overdose)^2)))
+  vec[i]<- sqrt(mean((pred - testData$Overdose)^2))
+}
+mean(vec)
 
+ctrl<-trainControl(method = "cv", number = 6) # I think this can be changes to leave one out somehow. probably via the "method" argument of this function.
+lmCVFit<-train(Overdose ~ ., data = o, method = "rpart", trControl = ctrl, metric="RMSE")
+summary(lmCVFit)
+
+
+# Pruned Tree Mod --------------------
+# tree pruning by selecting alpha via cross val
 set.seed(1)
 
-pows <- seq(-10, -0.2, by = 0.5)
-lambdas <- 10^pows
-train.err <- rep(NA, length(lambdas))
+rpart.op <- rpart(Overdose ~., op)
+rpart.op
+printcp(rpart.op) 
+plotcp(rpart.op)
 
-##for (i in 1:length(lambdas)) {
- # boost <- gbm(Overdose ~ ., data = train, distribution = "gaussian", n.trees = 100,
-#               shrinkage = lambdas[i])
-#  
-#  pred.train <- predict(boost, train, n.trees = 1000)
-#  train.err[i] <- mean((pred.train - train$Salary)^2)
-#}
+rpart.op2 <- rpart(Overdose ~., op, 
+                   control = rpart.control(cp = .021))
 
-#Train v test set doesnt work too small
-boost <- gbm(Overdose ~ ., data = o, distribution = "gaussian", n.trees = 100)
-summary(boost)
+printcp(rpart.op2)
 
-pred <- predict(boost, o)
-sqrt(mean((pred - o$Overdose)^2)) #RMSE is about 5
-plot(pred, o$Overdose)
+#to get training error via rpart from cp, multiply the relative error by the root node error
+#using tree package to get training error
 
-# caret way 
+tree.op = tree(Overdose ~., op)
+plot(tree.op)
+text(tree.op, pretty = 0)
+
+prune.op = prune(tree.op, best=3) #best tree has 3 terminal nodes
+plot(prune.op)
+text(prune.op, pretty = 0)
+
+set.seed(1)
+cvSplits <- createFolds(op$Overdose, 
+                        k = 6, 
+                        returnTrain = TRUE)
+K <- 6
+mseK2a <- rep(NA, K)
+
+for(k in 1:K)
+{
+  trRows <- cvSplits[[k]]
+  fit_tr2a = tree(Overdose ~., data = op[trRows,])
+  mseK2a[k] <- mean((predict(fit_tr2a, op[-trRows,])-op$Overdose[-trRows])^2)
+}
+# K-fold MSE
+sqrt(mean(mseK2a))
+
+set.seed(1)
+cvSplits <- createFolds(op$Overdose, 
+                        k = 6, 
+                        returnTrain = TRUE)
+K <- 6
+mseK2 <- rep(NA, K)
+
+for(k in 1:K)
+{
+  trRows <- cvSplits[[k]]
+  tree.op = tree(Overdose ~., data = op[trRows,])
+  fit_tr2 <- prune(tree.op, best=3)
+  mseK2[k] <- mean((predict(fit_tr2, op[-trRows,])-op$Overdose[-trRows])^2)
+}
+# K-fold RMSE
+sqrt(mean(mseK2))
+8.9^2
+
+# Boosted Tree Mod --------------------
+set.seed(1)
 ctrl<-trainControl(method = "cv",
                    number = 6)
 
 tuneGrid<-  expand.grid(interaction.depth = c(3,5), 
-                        n.trees = c(100, 500),
-                        shrinkage = c(.01, .1),
-                        n.minobsinnode = c(2, 8))
+                        n.trees = c(300, 500, 750),
+                        shrinkage = c(.001,.01, .1),
+                        n.minobsinnode = c(2, 5, 8))
 
 boost.mod <-train(Overdose ~ ., data = o, 
                   method = "gbm", 
@@ -142,6 +203,10 @@ boost.mod$bestTune
 boost.mod$finalModel
 
 boost.mod$results$RMSE[which.min(boost.mod$results$RMSE)] #6.09
+
+barplot(varImp(boost.mod))
+plot(boost.mod)
+
 
 # RF Tree Mod --------------------
 set.seed(1)
@@ -154,6 +219,21 @@ importance(rfmod)
 
 sqrt(mean((pred - o$Overdose)^2)) #RMSE is about 3 best!
 plot(pred, o$Overdose)
+
+tuneGrid<-  expand.grid(interaction.depth = c(3,5, 7), 
+                        n.trees = c(300, 500, 750),
+                        shrinkage = c(.001,.01, .1),
+                        n.minobsinnode = c(2, 5, 8))
+
+tuneGrid<-  expand.grid(mtry = c(7,12,20))
+
+ctrl<-trainControl(method = "cv", number = 6, verbose = TRUE) # I think this can be changes to leave one out somehow. probably via the "method" argument of this function.
+lmCVFit<-train(Overdose ~ ., data = o, method = "rf",
+               tuneGrid = tuneGrid,
+               trControl = ctrl, metric="RMSE")
+summary(lmCVFit)
+
+lmCVFit$finalModel
 
 
 # Bagged Tree Mod --------------------
@@ -169,17 +249,9 @@ pred = predict(bag.mod, newdata = o)
 sqrt(mean((pred - o$Overdose)^2)) #RMSE is about still good !
 plot(pred, o$Overdose)
 
+ctrl<-trainControl(method = "cv", number = 6) # I think this can be changes to leave one out somehow. probably via the "method" argument of this function.
+lmCVFit<-train(Overdose ~ ., data = o, method = "treebag", trControl = ctrl, metric="RMSE")
+summary(lmCVFit)
 
 
-# SVM Mod --------------------
-tune.out <- tune(svm, Overdose ~ ., data= o, 
-                 kernel="linear",
-                 ranges=list(cost=c(0.1,1,10, 100),
-                             gamma=c(0.0001,0.001,0.01,0.1,0.5) ))
 
-summary(tune.out)
-
-pred <- predict(tune.out$best.model, 
-                         newdata = o)
-
-sqrt(mean((pred - o$Overdose)^2)) #6, worst performance
